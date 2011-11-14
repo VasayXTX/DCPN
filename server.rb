@@ -44,7 +44,7 @@ class Handler
     {
       'rangeDown' => r_down,
       'rangeUp' => r_up,
-      'accurancy' => 4
+      'accuracy' => 4
     }
   end
 
@@ -68,9 +68,10 @@ f_log = File.open 'logfile.out', 'a+'
 
 begin
   loop do
-    nsock = select(socks)
-    next if nsock.nil?
-    for s in nsock[0]
+    i_sock = select(socks)[0]
+    next if i_sock.nil?
+    puts i_sock
+    for s in i_sock
       if s == serv
         socks << s.accept
       else
@@ -83,7 +84,11 @@ begin
       end
     end
   end
+rescue Interrupt, SystemExit
+  puts 'Server was stopped'
+  f_log.close
 rescue Exception
+  puts 'Error occurred in the server. See logs for more information'
   f_log.close
 end
 
