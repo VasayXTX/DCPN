@@ -3,7 +3,7 @@
 %w[socket json].each { |gem| require gem }
 
 class RangeGenerator
-  STEP = 1000000
+  STEP = 10 ** 6
   attr_reader :range
 
   def initialize step = STEP
@@ -20,7 +20,8 @@ class RangeGenerator
 end
 
 class Handler
-  def initialize range_step
+  def initialize range_step, log_name
+    @log = File.open log_name, 'a+'
     @resp_map = {
       'getRange' => :cmd_get_range,
       'putSolution' => :cmd_put_solution
@@ -44,13 +45,15 @@ class Handler
     {
       'rangeDown' => r_down,
       'rangeUp' => r_up,
-      'accuracy' => 4
     }
   end
 
   def cmd_put_solution h_req
-
+    @log.puts h_req['primes'].to_s
+    {}
   end
+
+  def close_log; @log.close; end
 end
 
 params = {
@@ -62,15 +65,12 @@ params = {
 serv = TCPServer.new params[:host], params[:port]
 socks = [serv]
 
-handler = Handler.new params[:step]
-
-f_log = File.open 'logfile.out', 'a+'
+handler = Handler.new params[:step], 'logfile'
 
 begin
   loop do
     i_sock = select(socks)[0]
     next if i_sock.nil?
-    puts i_sock
     for s in i_sock
       if s == serv
         socks << s.accept
@@ -86,9 +86,9 @@ begin
   end
 rescue Interrupt, SystemExit
   puts 'Server was stopped'
-  f_log.close
-rescue Exception
-  puts 'Error occurred in the server. See logs for more information'
-  f_log.close
+  handler.close_log
+rescue Exception => ex
+  puts ex.message
+  handler.close_log
 end
 
