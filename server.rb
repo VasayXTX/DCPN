@@ -1,9 +1,9 @@
 #coding: utf-8
 
-%w[socket json].each { |gem| require gem }
+%w[socket eventmachine].each { |gem| require gem }
 
 class RangeGenerator
-  STEP = 10 ** 6
+  STEP = 10 ** 4
   attr_reader :range
 
   def initialize step = STEP
@@ -20,8 +20,7 @@ class RangeGenerator
 end
 
 class Handler
-  def initialize range_step, log_name
-    @log = File.open log_name, 'a+'
+  def initialize range_step
     @resp_map = {
       'getRange' => :cmd_get_range,
       'putSolution' => :cmd_put_solution
@@ -30,16 +29,18 @@ class Handler
   end
 
   def handle req
-    h = JSON.parse req
-    unless cmd = @resp_map[h['cmd']]
-      return { 'status' => 'ERROR', 'msg' => 'Illegal command' }.to_json
+    if (cmd = @resp_map[req['cmd']]).nil?
+      return {
+        'status' => 'ERROR',
+        'msg' => 'Illegal command'
+      }
     end
-    resp = self.send cmd.to_sym, h
+    resp = self.send cmd, req
 
-    resp.merge({ 'status' => 'OK' }).to_json
+    resp.merge({ 'status' => 'OK' })
   end
 
-  def cmd_get_range h_req
+  def cmd_get_range req
     r_down, r_up = @range_gen.next
     
     {
@@ -48,47 +49,43 @@ class Handler
     }
   end
 
-  def cmd_put_solution h_req
-    @log.puts h_req['primes'].to_s
+  def cmd_put_solution req
+    puts req['primes'].size
     {}
   end
 
   def close_log; @log.close; end
 end
 
-params = {
-  :host => '127.0.0.1',
-  :port => ARGV[0] ||= 4567,
-  :step => ARGV[1] ||= RangeGenerator::STEP
-}
-
-serv = TCPServer.new params[:host], params[:port]
-socks = [serv]
-
-handler = Handler.new params[:step], 'logfile'
-
-begin
-  loop do
-    i_sock = select(socks)[0]
-    next if i_sock.nil?
-    for s in i_sock
-      if s == serv
-        socks << s.accept
-      else
-        if s.eof?
-          s.close
-          socks.delete(s)
-        else
-          s.puts handler.handle(s.gets)
-        end
-      end
+class PServer
+  def self.start host, port
+    EventMachine::run do
+      EventMachine::start_server host, port, EM
     end
   end
-rescue Interrupt, SystemExit
-  puts 'Server was stopped'
-  handler.close_log
-rescue Exception => ex
-  puts ex.message
-  handler.close_log
+  
+  private
+    module EM
+      include EventMachine::Protocols::ObjectProtocol
+
+      @@handler = Handler.new RangeGenerator::STEP
+
+      def post_init
+        puts 'Connection'
+      end
+
+      def unbind
+        puts 'Disconnection'
+      end
+
+      def receive_object obj
+        send_object @@handler.handle(obj)
+      end
+    end
 end
+
+HOST = '127.0.0.1'
+PORT = ARGV[0] ||= 4567
+
+PServer.start HOST, PORT
 
