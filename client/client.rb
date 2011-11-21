@@ -7,28 +7,57 @@ HOST, PORT = ARGV[0], ARGV[1]
 N = ARGV[2] ? ARGV[2].to_i : 1
 
 class SysInfo
-  def self.get
+  def self.get_h_info
     f = IO.popen('ohai')
     info = f.readlines
     info = (info.each { |str| str.chomp! }).join('')
     h_info = JSON.parse(info)
+    
+    h_info
+  end
+  private_class_method :get_h_info
 
+  def self.get_spec_linux h_info
     {
-      'os' => {
-        'name' => h_info['os'],
-        'version' => h_info['os_version']
-      },
-      'platform' => {
-        'name' => h_info['platform'],
-        'version' => h_info['platform_version']
-      },
-      'user' => h_info['current_user'],
       'memory' => {
         'total' => h_info['memory']['total'],
         'free' => h_info['memory']['free']
       },
-      'cpu' => h_info['cpu']
     }
+  end
+  private_class_method :get_spec_linux
+
+  def self.get_spec_windows h_info
+    {
+      'memory' => {
+        'total' => h_info['kernel']['cs_info']['total_physical_memory'],
+        'free' => h_info['kernel']['os_info']['free_physical_memory']
+      },
+    }
+  end
+  private_class_method :get_spec_windows
+
+  def self.get
+    h_info = get_h_info
+
+    res = if h_info['os'] == 'linux'
+            get_spec_linux h_info
+          else
+            get_spec_windows h_info
+          end
+
+    res.merge!({
+      'os' => {
+        'name' => h_info['os'],
+        'version' => h_info['os_version']
+      },
+      'user' => h_info['current_user'],
+      'cpu' => h_info['cpu']
+    })
+
+    puts res
+
+    res
   end
 end
 
@@ -50,6 +79,8 @@ class PClient
     module EM
       include EventMachine::Protocols::ObjectProtocol
 
+      @@sys_info = SysInfo.get
+
       HANDLING = {
         :get_range => :hndl_get_range,
         :put_solution => :hndl_put_solution
@@ -58,7 +89,7 @@ class PClient
       def post_init
         send_object({
           'cmd' => 'getRange',
-          'sys_info' => SysInfo.get
+          'sys_info' => @@sys_info
         })
         @last_cmd = :get_range
       end
