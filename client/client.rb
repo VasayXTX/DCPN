@@ -3,8 +3,8 @@
 %w[eventmachine json].each { |gem| require gem }
 require File.join(File.dirname(__FILE__), 'primes_search_engine')
 
-HOST, PORT = 'localhost', 4567
-N = ARGV[0] ? ARGV[0].to_i : 1
+HOST, PORT = ARGV[0], ARGV[1]
+N = ARGV[2] ? ARGV[2].to_i : 1
 
 class SysInfo
   def self.get

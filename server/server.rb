@@ -88,7 +88,7 @@ class PServer
     end
 end
 
-HOST, PORT = '127.0.0.1', 4567
+HOST, PORT = '', 4567
 
 Mongoid.configure do |config|
   name = "primes"
