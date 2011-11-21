@@ -1,0 +1,9 @@
+#coding: utf-8
+
+source 'http://rubygems.org'
+
+gem 'eventmachine'
+gem "mongoid", "~> 2.3"
+gem "bson_ext", "~> 1.4"
+gem 'json'
+

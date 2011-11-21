@@ -1,0 +1,42 @@
+#coding: utf-8
+
+require 'mongoid'
+require File.join(File.dirname(__FILE__), 'models', 'prime')
+
+Mongoid.configure do |config|
+  name = "primes"
+  host = "localhost"
+  config.master = Mongo::Connection.new.db(name)
+end
+
+task :cleanup do
+  Prime.delete_all
+end
+
+def make_report &prc
+  primes = Prime.all.without(:_id)
+  unless primes.nil?
+    primes.each { |p| prc.call p }
+  end
+
+end
+
+task :show_all do
+  make_report do |p|
+    puts(
+      "Range: #{p[:range]}\n" + 
+      "Number of primes: #{p[:nums].size}\n" +
+      "Primes: #{p[:nums]}\n\n"
+    )
+  end
+end
+
+task :show do
+  make_report do |p|
+    puts(
+      "Range: #{p[:range]}\n" + 
+      "Number of primes: #{p[:nums].size}\n"
+    )
+  end
+end
+

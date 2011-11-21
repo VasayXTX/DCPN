@@ -1,17 +1,18 @@
 #coding: utf-8
 
-%w[socket eventmachine].each { |gem| require gem }
+%w[eventmachine mongoid].each { |gem| require gem }
+require File.join(File.dirname(__FILE__), 'models', 'prime')
 
 class RangeGenerator
-  STEP = 10 ** 4
+  STEP = ARGV[0] ? ARGV[0].to_i : 10 ** 6
   attr_reader :range
 
   def initialize step = STEP
-    @step, @range = step, [2, step]
+    @step, @range = step, 2..step
     @fiber = Fiber.new do
       loop do
         Fiber.yield @range
-        @range = [@range[1] + 1, @range[1] + @step]
+        @range = (@range.max + 1..@range.max + @step)
       end
     end
   end
@@ -41,18 +42,21 @@ class Handler
   end
 
   def cmd_get_range req
-    r_down, r_up = @range_gen.next
-    
-    {
-      'rangeDown' => r_down,
-      'rangeUp' => r_up,
-    }
+    parse_sys_info req['sys_info']
+    { 'range' => @range_gen.next }
   end
+  private :cmd_get_range
 
   def cmd_put_solution req
-    puts req['primes'].size
+    Prime.create!(range: req['range'], nums: req['primes'])
     {}
   end
+  private :cmd_put_solution
+
+  def parse_sys_info sys_info
+    #.........parsing...........
+  end
+  private :parse_sys_info
 
   def close_log; @log.close; end
 end
@@ -84,8 +88,13 @@ class PServer
     end
 end
 
-HOST = '127.0.0.1'
-PORT = ARGV[0] ||= 4567
+HOST, PORT = '127.0.0.1', 4567
+
+Mongoid.configure do |config|
+  name = "primes"
+  host = "localhost"
+  config.master = Mongo::Connection.new.db(name)
+end
 
 PServer.start HOST, PORT
 

@@ -1,0 +1,9 @@
+#coding: utf-8
+
+source 'http://rubygems.org'
+
+gem 'eventmachine'
+gem 'json'
+gem 'ohai'
+gem 'progressbar'
+

@@ -1,8 +1,19 @@
 #coding: utf-8
 
+require 'progressbar'
+
 class PSearchEngine
-  def self.miller_rabin r_down, r_up
-    (r_down..r_up).to_a.select { |x| MillerRabin.test(x, Math.log2(x).ceil) }
+  def self.miller_rabin range
+    puts "Miller-Rabin test for #{range}"
+    pbar = ProgressBar.new "Processing", 100
+    pbar_step = 100.to_f / (range.max - range.min)
+    res = range.to_a.select do |x|
+      pbar.inc pbar_step
+      MillerRabin.test(x, Math.log2(x).ceil)
+    end
+    pbar.finish
+
+    res
   end
   
   private
@@ -43,5 +54,4 @@ class PSearchEngine
       end
     end
 end
-
 

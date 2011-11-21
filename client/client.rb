@@ -1,9 +1,36 @@
 #coding: utf-8
 
-%w[eventmachine].each { |gem| require gem }
+%w[eventmachine json].each { |gem| require gem }
 require File.join(File.dirname(__FILE__), 'primes_search_engine')
 
-th_num, host, port = ARGV
+HOST, PORT = 'localhost', 4567
+N = ARGV[0] ? ARGV[0].to_i : 1
+
+class SysInfo
+  def self.get
+    f = IO.popen('ohai')
+    info = f.readlines
+    info = (info.each { |str| str.chomp! }).join('')
+    h_info = JSON.parse(info)
+
+    {
+      'os' => {
+        'name' => h_info['os'],
+        'version' => h_info['os_version']
+      },
+      'platform' => {
+        'name' => h_info['platform'],
+        'version' => h_info['platform_version']
+      },
+      'user' => h_info['current_user'],
+      'memory' => {
+        'total' => h_info['memory']['total'],
+        'free' => h_info['memory']['free']
+      },
+      'cpu' => h_info['cpu']
+    }
+  end
+end
 
 class PException < Exception
   attr_reader :msg
@@ -30,10 +57,8 @@ class PClient
 
       def post_init
         send_object({
-          'cmd' => 'getRange1',
-          'CPU' => 'Some CPU',
-          'RAM' => 'Some RAM',
-          'HDD' => 'Some HDD'
+          'cmd' => 'getRange',
+          'sys_info' => SysInfo.get
         })
         @last_cmd = :get_range
       end
@@ -49,10 +74,10 @@ class PClient
       def hndl_get_range obj
         resp = {
           'cmd' => 'putSolution',
-          'primes' => PSearchEngine.miller_rabin(obj['rangeDown'], obj['rangeUp'])
+          'range' => obj['range'],
+          'primes' => PSearchEngine.miller_rabin(obj['range'])
         }
         @last_cmd = :put_solution
-        puts resp['primes'].size
         send_object resp
       end
 
@@ -63,7 +88,7 @@ class PClient
 end
 
 begin
-  PClient.new.start host, port
+  PClient.new.start HOST, PORT, N
 rescue PException => ex
   puts ex.msg
 end
