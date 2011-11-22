@@ -15,6 +15,10 @@ class PSearchEngine
 
     res
   end
+
+  def self.miller_rabin_st x
+    MillerRabin.test(x, Math.log2(x).ceil)
+  end
   
   private
     module MillerRabin

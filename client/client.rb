@@ -55,8 +55,6 @@ class SysInfo
       'cpu' => h_info['cpu']
     })
 
-    puts res
-
     res
   end
 end

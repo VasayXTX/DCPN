@@ -4,15 +4,16 @@
 require File.join(File.dirname(__FILE__), 'models', 'prime')
 
 class RangeGenerator
-  STEP = ARGV[0] ? ARGV[0].to_i : 10 ** 6
+  START = ARGV[0] ? ARGV[0].to_i : 2
+  STEP = ARGV[1] ? ARGV[1].to_i : 10 ** 6
   attr_reader :range
 
   def initialize step = STEP
-    @step, @range = step, 2..step
+    @step, @range = step, (START..START+step)
     @fiber = Fiber.new do
       loop do
         Fiber.yield @range
-        @range = (@range.max + 1..@range.max + @step)
+        @range = (@range.max+1..@range.max+@step)
       end
     end
   end
@@ -48,7 +49,13 @@ class Handler
   private :cmd_get_range
 
   def cmd_put_solution req
-    Prime.create!(range: req['range'], nums: req['primes'])
+    puts req
+    Prime.create!(
+      range_down: req['range'].min.to_s,
+      range_up: req['range'].max.to_s,
+      nums: (req['primes'].map { |el| el.to_s })
+    )
+
     {}
   end
   private :cmd_put_solution

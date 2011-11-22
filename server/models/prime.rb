@@ -2,7 +2,8 @@
 
 class Prime
   include Mongoid::Document
-  field :range, type: Range
-  field :nums, type: Array
+  field :range_down, type: String
+  field :range_up, type: String
+  field :nums, type: Array  #Array of strings
 end
 

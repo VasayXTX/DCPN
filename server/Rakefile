@@ -9,7 +9,7 @@ Mongoid.configure do |config|
   config.master = Mongo::Connection.new.db(name)
 end
 
-task :cleanup do
+task :c do
   Prime.delete_all
 end
 
@@ -21,20 +21,20 @@ def make_report &prc
 
 end
 
-task :show_all do
+task :sa do
   make_report do |p|
     puts(
-      "Range: #{p[:range]}\n" + 
+      "Range: #{p[:range_down]}..#{p[:range_up]}\n" + 
       "Number of primes: #{p[:nums].size}\n" +
       "Primes: #{p[:nums]}\n\n"
     )
   end
 end
 
-task :show do
+task :s do
   make_report do |p|
     puts(
-      "Range: #{p[:range]}\n" + 
+      "Range: #{p[:range_down]}..#{p[:range_up]}\n" + 
       "Number of primes: #{p[:nums].size}\n"
     )
   end
