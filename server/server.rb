@@ -49,7 +49,6 @@ class Handler
   private :cmd_get_range
 
   def cmd_put_solution req
-    puts req
     Prime.create!(
       range_down: req['range'].min.to_s,
       range_up: req['range'].max.to_s,
