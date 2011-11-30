@@ -1,10 +1,9 @@
 #coding: utf-8
 
-%w[eventmachine json].each { |gem| require gem }
+%w[eventmachine json yaml].each { |gem| require gem }
 require File.join(File.dirname(__FILE__), 'primes_search_engine')
 
-HOST, PORT = ARGV[0], ARGV[1]
-N = ARGV[2] ? ARGV[2].to_i : 1
+cnfg = YAML.load_file ARGV[0] ? ARGV[0] : 'configure.yml'
 
 class SysInfo
   def self.get_h_info
@@ -66,6 +65,9 @@ end
 
 class PClient
   def start host, port, n = 1
+    puts host
+    puts port
+    puts n
     n.times do
       EventMachine::run do
         EventMachine::connect host, port, EM
@@ -77,7 +79,7 @@ class PClient
     module EM
       include EventMachine::Protocols::ObjectProtocol
 
-      @@sys_info = SysInfo.get
+      #@@sys_info = SysInfo.get
 
       HANDLING = {
         :get_range => :hndl_get_range,
@@ -86,8 +88,9 @@ class PClient
 
       def post_init
         send_object({
+          'round_robin' => true,
           'cmd' => 'getRange',
-          'sys_info' => @@sys_info
+          #'sys_info' => @@sys_info
         })
         @last_cmd = :get_range
       end
@@ -117,7 +120,11 @@ class PClient
 end
 
 begin
-  PClient.new.start HOST, PORT, N
+  PClient.new.start(
+    cnfg['host'],
+    cnfg['port'],
+    cnfg['range_nums'] ? cnfg['range_nums'] : 1
+  )
 rescue PException => ex
   puts ex.msg
 end

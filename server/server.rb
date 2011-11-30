@@ -10,15 +10,24 @@ class RangeGenerator
 
   def initialize step = STEP
     @step, @range = step, (START..START+step)
+    @buf = []
     @fiber = Fiber.new do
       loop do
-        Fiber.yield @range
-        @range = (@range.max+1..@range.max+@step)
+        unless @buf.empty?
+          r = @buf.pop
+          is_next = false
+        else
+          r = @range
+          is_next = true
+        end
+        Fiber.yield r
+        @range = (@range.max+1..@range.max+@step) if is_next
       end
     end
   end
   
   def next; @fiber.resume; end
+  def push range; @buf = [range] + @buf; end
 end
 
 class Handler
@@ -28,6 +37,7 @@ class Handler
       'putSolution' => :cmd_put_solution
     }
     @range_gen = RangeGenerator.new range_step
+    @ranges = {}
   end
 
   def handle req
@@ -43,8 +53,10 @@ class Handler
   end
 
   def cmd_get_range req
-    parse_sys_info req['sys_info']
-    { 'range' => @range_gen.next }
+    #parse_sys_info req['sys_info']
+    r = @range_gen.next
+    @ranges[r] = true
+    { 'range' => r }
   end
   private :cmd_get_range
 
@@ -54,6 +66,7 @@ class Handler
       range_up: req['range'].max.to_s,
       nums: (req['primes'].map { |el| el.to_s })
     )
+    @ranges.delete(req['range'])
 
     {}
   end
@@ -64,7 +77,9 @@ class Handler
   end
   private :parse_sys_info
 
-  def close_log; @log.close; end
+  def check_range range
+    @range_gen.push(range) if @ranges[range]
+  end
 end
 
 class PServer
@@ -85,11 +100,14 @@ class PServer
       end
 
       def unbind
+        @@handler.check_range(@range) if @range
         puts 'Disconnection'
       end
 
       def receive_object obj
-        send_object @@handler.handle(obj)
+        resp = @@handler.handle obj
+        @range = resp['range']
+        send_object resp
       end
     end
 end
