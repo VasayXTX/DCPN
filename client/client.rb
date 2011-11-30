@@ -65,18 +65,13 @@ end
 
 class PClient
   def start host, port, n = 1
-    puts host
-    puts port
-    puts n
-    n.times do
-      EventMachine::run do
-        EventMachine::connect host, port, EM
-      end
+    EventMachine::run do
+      EventMachine::connect host, port, EM, n
     end
   end
 
   private
-    module EM
+    class EM < EventMachine::Connection
       include EventMachine::Protocols::ObjectProtocol
 
       #@@sys_info = SysInfo.get
@@ -86,14 +81,12 @@ class PClient
         :put_solution => :hndl_put_solution
       }
 
-      def post_init
-        send_object({
-          'round_robin' => true,
-          'cmd' => 'getRange',
-          #'sys_info' => @@sys_info
-        })
-        @last_cmd = :get_range
+      def initialize *args
+        super
+        @it_num = args[0]
       end
+
+      def post_init; cmd_get_range; end
 
       def receive_object obj
         raise PException.new(obj['msg']) unless obj['status'] == 'OK'
@@ -103,18 +96,38 @@ class PClient
         end
       end
 
+      def cmd_get_range
+        send_object({
+          'round_robin' => true,
+          'cmd' => 'getRange',
+          #'sys_info' => @@sys_info
+        })
+        @last_cmd = :get_range
+      end
+
       def hndl_get_range obj
-        resp = {
-          'cmd' => 'putSolution',
+        cmd_put_solution({
           'range' => obj['range'],
           'primes' => PSearchEngine.miller_rabin(obj['range'])
+        })
+      end
+
+      def cmd_put_solution sol
+        resp = {
+          'cmd' => 'putSolution',
+          'range' => sol['range'],
+          'primes' => sol['primes']
         }
         @last_cmd = :put_solution
         send_object resp
       end
 
       def hndl_put_solution obj
-        EventMachine::stop_event_loop
+        if (@it_num -= 1) > 0
+          cmd_get_range
+        else
+          EventMachine::stop_event_loop
+        end
       end
     end
 end
