@@ -1,9 +1,7 @@
 #coding: utf-8
 
-%w[eventmachine json yaml].each { |gem| require gem }
+%w[eventmachine json yaml socket].each { |gem| require gem }
 require File.join(File.dirname(__FILE__), 'primes_search_engine')
-
-cnfg = YAML.load_file ARGV[0] ? ARGV[0] : 'configure.yml'
 
 class SysInfo
   def self.get_h_info
@@ -64,10 +62,12 @@ class PException < Exception
 end
 
 class PClient
-  def start host, port, n = 1
+  def start host, port, n = 1, rr
     EventMachine::run do
       EventMachine::connect host, port, EM, n
+      Thread.new { RRServer.start rr['host'], rr['port'] } if rr
     end
+    Thread.list.each { |th| th.join unless th == Thread.main }
   end
 
   private
@@ -81,9 +81,9 @@ class PClient
         :put_solution => :hndl_put_solution
       }
 
-      def initialize *args
+      def initialize it_num
         super
-        @it_num = args[0]
+        @it_num = it_num
       end
 
       def post_init; cmd_get_range; end
@@ -92,7 +92,6 @@ class PClient
         raise PException.new(obj['msg']) unless obj['status'] == 'OK'
         unless obj.has_key?('cmd')
           self.send HANDLING[@last_cmd], obj
-        else
         end
       end
 
@@ -106,9 +105,10 @@ class PClient
       end
 
       def hndl_get_range obj
+        primes, params = PSearchEngine.miller_rabin(obj['range'])
         cmd_put_solution({
-          'range' => obj['range'],
-          'primes' => PSearchEngine.miller_rabin(obj['range'])
+          'range' => params['range'],
+          'primes' => primes
         })
       end
 
@@ -127,16 +127,55 @@ class PClient
           cmd_get_range
         else
           EventMachine::stop_event_loop
+          RRServer.stop
+        end
+      end
+    end
+
+    #Server for round-robin algorithm
+    class RRServer
+      def self.start host, port
+        @@host, @@port = host, port
+        serv = TCPServer.new @@host, @@port
+        socks = [serv]
+
+        worked = true
+        while worked
+          nsock = select(socks)
+          next if nsock == nil
+          for s in nsock[0]
+            if s == serv
+              socks.push(s.accept)
+            else
+              if s.eof?
+                s.close
+                socks.delete(s)
+              else
+                s = JSON.parse s.gets
+                worked = false if s['cmd'] == 'exit'
+              end
+            end
+          end
+        end
+        socks.each { |s| s.close }
+      end
+
+      def self.stop
+        TCPSocket.open(@@host, @@port) do |s|
+          s.puts ({ 'cmd' => 'exit' }).to_json
         end
       end
     end
 end
 
+cnfg = YAML.load_file ARGV[0] ? ARGV[0] : 'configure.yml'
+
 begin
   PClient.new.start(
     cnfg['host'],
     cnfg['port'],
-    cnfg['range_nums'] ? cnfg['range_nums'] : 1
+    cnfg['range_nums'] ? cnfg['range_nums'] : 1,
+    cnfg['round_robin']
   )
 rescue PException => ex
   puts ex.msg
