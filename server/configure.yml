@@ -1,0 +1,9 @@
+host: ''
+port: 4567
+round_robin:
+  interval: 10
+  requred_nums: 2
+db:
+  name: 'primes'
+  host: 'localhost'
+

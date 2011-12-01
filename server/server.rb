@@ -1,6 +1,6 @@
 #coding: utf-8
 
-%w[eventmachine mongoid].each { |gem| require gem }
+%w[eventmachine mongoid yaml].each { |gem| require gem }
 require File.join(File.dirname(__FILE__), 'models', 'prime')
 
 class RangeGenerator
@@ -83,17 +83,22 @@ class Handler
 end
 
 class PServer
-  def self.start host, port
+  def self.start host, port, rr
     EventMachine::run do
-      EventMachine::start_server host, port, EM
+      EventMachine::start_server host, port, EM, rr
     end
   end
   
   private
-    module EM
+    class EM < EventMachine::Connection
       include EventMachine::Protocols::ObjectProtocol
 
       @@handler = Handler.new RangeGenerator::STEP
+
+      def initialize rr
+        super
+        @rr = rr
+      end
 
       def post_init
         puts 'Connection'
@@ -112,13 +117,17 @@ class PServer
     end
 end
 
-HOST, PORT = '', 4567
+cnfg = YAML.load_file 'configure.yml'
 
-Mongoid.configure do |config|
-  name = "primes"
-  host = "localhost"
-  config.master = Mongo::Connection.new.db(name)
+Mongoid.configure do |c|
+  name = cnfg['db']['name']
+  host = cnfg['db']['host']
+  c.master = Mongo::Connection.new.db(name)
 end
 
-PServer.start HOST, PORT
+PServer.start(
+  cnfg['host'],
+  cnfg['port'],
+  cnfg['round_robin']
+)
 
