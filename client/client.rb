@@ -32,12 +32,12 @@ class PClient
       include EventMachine::Protocols::ObjectProtocol
 
       #@@sys_info = SysInfo.get
-
-      HANDLING = {
-        :join => :hndl_join,
-        :get_range => :hndl_get_range,
-        :put_solution => :hndl_put_solution
-      }
+      
+      CMDS = %w[join getRange putSolution]
+      @@hndl_cmd_map = Hash.new do |h, k|
+        h[k] = "hndl_#{(k.gsub(/[A-Z]/) { |s| s = "_#{s.downcase}".to_sym})}"
+      end
+      CMDS.each { |cmd| @@hndl_cmd_map[cmd] }
 
       def initialize params, rr
         super
@@ -50,7 +50,7 @@ class PClient
       def receive_object obj
         raise PException.new(obj['msg']) unless obj['status'] == 'OK'
         unless obj.has_key?('cmd')
-          self.send HANDLING[@last_cmd], obj
+          self.send @@hndl_cmd_map[@last_cmd], obj
         end
       end
 
@@ -63,7 +63,7 @@ class PClient
         }
         obj['round_robin'] = @rr if @rr
         send_object(obj)
-        @last_cmd = :join
+        @last_cmd = 'join'
       end
 
       def hndl_join obj
@@ -78,7 +78,7 @@ class PClient
         }
         obj['round_robin'] = @rr if @rr
         send_object(obj)
-        @last_cmd = :get_range
+        @last_cmd = 'get_range'
       end
 
       def hndl_get_range obj
@@ -96,7 +96,7 @@ class PClient
           'range' => sol['range'],
           'primes' => sol['primes']
         }
-        @last_cmd = :put_solution
+        @last_cmd = 'put_solution'
         send_object resp
       end
 

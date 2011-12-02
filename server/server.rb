@@ -11,11 +11,11 @@ end
 
 class Handler
 
-  CMDS = ['join', 'getRange', 'putSolution']
-  @@resp_map = Hash.new do |h, k| 
+  CMDS = %w[join getRange putSolution]
+  @@cmd_map = Hash.new do |h, k| 
     h[k] = "cmd_#{(k.gsub(/[A-Z]/) { |s| s = "_#{s.downcase}".to_sym})}"
   end
-  CMDS.each { |cmd| @@resp_map[cmd] }
+  CMDS.each { |cmd| @@cmd_map[cmd] }
 
   def initialize range_step
     @range_gen = RangeGenerator.new range_step
@@ -24,7 +24,7 @@ class Handler
   end
 
   def handle req, client_id
-    if (cmd = @@resp_map[req['cmd']]).nil?
+    if (cmd = @@cmd_map[req['cmd']]).nil?
       return {
         'status' => 'ERROR',
         'msg' => 'Illegal command'
