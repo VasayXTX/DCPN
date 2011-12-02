@@ -24,6 +24,8 @@ end
 task :sa do
   make_report do |p|
     puts(
+      "Login: #{p[:login]}",
+      "Host: #{p[:host]}",
       "Range: #{p[:range_down]}..#{p[:range_up]}\n" + 
       "Number of primes: #{p[:nums].size}\n" +
       "Primes: #{p[:nums]}\n\n"
@@ -34,6 +36,8 @@ end
 task :s do
   make_report do |p|
     puts(
+      "Login: #{p[:login]}",
+      "Host: #{p[:host]}",
       "Range: #{p[:range_down]}..#{p[:range_up]}\n" + 
       "Number of primes: #{p[:nums].size}\n"
     )

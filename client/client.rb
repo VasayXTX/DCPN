@@ -1,59 +1,11 @@
 #coding: utf-8
 
 %w[eventmachine json yaml socket].each { |gem| require gem }
-require File.join(File.dirname(__FILE__), 'primes_search_engine')
-
-class SysInfo
-  def self.get_h_info
-    f = IO.popen('ohai')
-    info = f.readlines
-    info = (info.each { |str| str.chomp! }).join('')
-    h_info = JSON.parse(info)
-    
-    h_info
-  end
-  private_class_method :get_h_info
-
-  def self.get_spec_linux h_info
-    {
-      'memory' => {
-        'total' => h_info['memory']['total'],
-        'free' => h_info['memory']['free']
-      },
-    }
-  end
-  private_class_method :get_spec_linux
-
-  def self.get_spec_windows h_info
-    {
-      'memory' => {
-        'total' => h_info['kernel']['cs_info']['total_physical_memory'],
-        'free' => h_info['kernel']['os_info']['free_physical_memory']
-      },
-    }
-  end
-  private_class_method :get_spec_windows
-
-  def self.get
-    h_info = get_h_info
-
-    res = if h_info['os'] == 'linux'
-            get_spec_linux h_info
-          else
-            get_spec_windows h_info
-          end
-
-    res.merge!({
-      'os' => {
-        'name' => h_info['os'],
-        'version' => h_info['os_version']
-      },
-      'user' => h_info['current_user'],
-      'cpu' => h_info['cpu']
-    })
-
-    res
-  end
+[
+  %w[primes_search_engine],
+  %w[sys_info]
+].each do |path| 
+  require File.join(File.dirname(__FILE__), *path)
 end
 
 class PException < Exception
@@ -62,31 +14,38 @@ class PException < Exception
 end
 
 class PClient
-  def start host, port, n = 1, rr
+  def start host, port, params, rr
     EventMachine::run do
-      EventMachine::connect host, port, EM, n
+      EventMachine::connect host, port, EM, params, rr
       Thread.new { RRServer.start rr['host'], rr['port'] } if rr
     end
+    RRServer.stop if rr
     Thread.list.each { |th| th.join unless th == Thread.main }
   end
 
   private
+    #******************************************
+    #--------------- EM client ----------------
+    #******************************************
     class EM < EventMachine::Connection
+
       include EventMachine::Protocols::ObjectProtocol
 
       #@@sys_info = SysInfo.get
 
       HANDLING = {
+        :join => :hndl_join,
         :get_range => :hndl_get_range,
         :put_solution => :hndl_put_solution
       }
 
-      def initialize it_num
+      def initialize params, rr
         super
-        @it_num = it_num
+        @params, @rr = params, rr
+        @it_num = params['range_nums'] ? params['range_nums'] : 1
       end
 
-      def post_init; cmd_get_range; end
+      def post_init; cmd_join; end
 
       def receive_object obj
         raise PException.new(obj['msg']) unless obj['status'] == 'OK'
@@ -95,12 +54,30 @@ class PClient
         end
       end
 
+      #---------------- cmd 'join' ---------------- 
+      def cmd_join
+        obj = {
+          'cmd' => 'join',
+          'login' => @params['login'],
+          'host' => @params['host']
+        }
+        obj['round_robin'] = @rr if @rr
+        send_object(obj)
+        @last_cmd = :join
+      end
+
+      def hndl_join obj
+        cmd_get_range
+      end
+
+      #---------------- cmd 'getRange' ---------------- 
       def cmd_get_range
-        send_object({
-          'round_robin' => true,
+        obj = {
           'cmd' => 'getRange',
           #'sys_info' => @@sys_info
-        })
+        }
+        obj['round_robin'] = @rr if @rr
+        send_object(obj)
         @last_cmd = :get_range
       end
 
@@ -112,6 +89,7 @@ class PClient
         })
       end
 
+      #---------------- cmd 'putSolution' ---------------- 
       def cmd_put_solution sol
         resp = {
           'cmd' => 'putSolution',
@@ -127,12 +105,13 @@ class PClient
           cmd_get_range
         else
           EventMachine::stop_event_loop
-          RRServer.stop
         end
       end
     end
 
-    #Server for round-robin algorithm
+    #******************************************
+    #---- Server for round-robin algorithm ----
+    #******************************************
     class RRServer
       def self.start host, port
         @@host, @@port = host, port
@@ -151,8 +130,8 @@ class PClient
                 s.close
                 socks.delete(s)
               else
-                s = JSON.parse s.gets
-                worked = false if s['cmd'] == 'exit'
+                h = JSON.parse s.gets
+                worked = false if h['cmd'] == 'exit'
               end
             end
           end
@@ -172,9 +151,9 @@ cnfg = YAML.load_file ARGV[0] ? ARGV[0] : 'configure.yml'
 
 begin
   PClient.new.start(
-    cnfg['host'],
-    cnfg['port'],
-    cnfg['range_nums'] ? cnfg['range_nums'] : 1,
+    cnfg['server']['host'],
+    cnfg['server']['port'],
+    cnfg['params'],
     cnfg['round_robin']
   )
 rescue PException => ex

@@ -1,7 +1,10 @@
-host: localhost
-port: 4567
-range_nums: 1
-round_robin:
+server:
+  host: localhost
+  port: 4567
+params:
   host: 'localhost'
+  login: 'client1'
+  range_nums: 1
+round_robin:
   port: 9001
 
