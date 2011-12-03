@@ -10,22 +10,41 @@ class ClientContainer
   def push client_id, client, rr = nil
     if rr
       @c_rr[client_id] = client
+      @c_rr[client_id].merge! rr
     else
       @c_simple[client_id] = client
     end
   end
 
-  def get client_id
-    return @c_rr[client_id] if @c_rr.has_key?(client_id)
-    @c_simple[client_id]
+  def find client_id
+    @c_simple[client_id] || @c_rr[client_id]
   end
 
   def pop client_id
     @c_rr.delete(client_id) unless @c_simple.delete(client_id)
   end
 
-  def get_size
-    @c_simple.size + @c_rr.size
+  #--------------- Ranges --------------- 
+  
+  def add_range client_id, r
+    find(client_id)['range'] = r
+  end
+
+  def remove_range client_id
+    find(client_id).delete 'range'
+  end
+
+  def get_range client_id
+    find(client_id)['range']
+  end
+
+  #--------------- Class methods --------------- 
+
+  def self.to_array c
+    arr = []
+    c.each_pair { |k, v| arr << [k, v] }
+
+    arr
   end
 end
 

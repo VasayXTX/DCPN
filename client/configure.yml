@@ -3,8 +3,6 @@ server:
   port: 4567
 params:
   host: 'localhost'
-  login: 'client1'
-  range_nums: 1
-round_robin:
-  port: 9001
+  login: 'ClientOne'
+  range_nums: 3
 

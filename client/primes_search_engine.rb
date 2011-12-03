@@ -5,21 +5,29 @@ require 'progressbar'
 class PSearchEngine
   @@status = :started
 
-  def self.miller_rabin range
+  def self.miller_rabin obj
+    range = obj['range']
     puts "Miller-Rabin test for #{range}"
     pbar = ProgressBar.new "Processing", 100
     pbar_step = 100.to_f / (range.max - range.min)
 
     res = []
+    acc = obj['cur_acc'] || Math.log2(range.min).ceil
     range.each do |x|
       pbar.inc pbar_step
-      is_prime, params = MillerRabin.test(x, Math.log2(x).ceil)
-      if @@status == :stoped
+      is_prime, params = MillerRabin.test(
+        x,
+        acc,
+        obj['cur_t'],
+        obj['cur_s']
+      )
+      unless params.nil?
         params['range'] = range.min..(x - 1)
         return [res, params]
       else
         res << x if is_prime
       end
+      acc = Math.log2(x+1).ceil
     end
 
     pbar.finish
@@ -45,13 +53,17 @@ class PSearchEngine
         res
       end
 
-      def self.test num, accuracy
+      def self.test num, acc, cur_t, cur_s
         return [num == 2, nil] if num.even? || num < 2
 
-        t, s = num - 1, 1
-        while (t >>= 1).even?; s += 1; end
+        if cur_t.nil? || cur_s.nil?
+          t, s = num - 1, 1
+          while (t >>= 1).even?; s += 1; end
+        else
+          t, s = cur_t, cur_s
+        end
 
-        (accuracy).times do |i|
+        (acc).times do |i|
           if PSearchEngine.get_status == :stoped
             return [
               false,

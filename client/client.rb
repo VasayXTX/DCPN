@@ -33,7 +33,7 @@ class PClient
 
       #@@sys_info = SysInfo.get
       
-      CMDS = %w[join getRange putSolution]
+      CMDS = %w[join getRange putSolution putPartSolution]
       @@hndl_cmd_map = Hash.new do |h, k|
         h[k] = "hndl_#{(k.gsub(/[A-Z]/) { |s| s = "_#{s.downcase}".to_sym})}"
       end
@@ -49,9 +49,9 @@ class PClient
 
       def receive_object obj
         raise PException.new(obj['msg']) unless obj['status'] == 'OK'
-        unless obj.has_key?('cmd')
+        #unless obj.has_key?('cmd')
           self.send @@hndl_cmd_map[@last_cmd], obj
-        end
+        #end
       end
 
       #---------------- cmd 'join' ---------------- 
@@ -82,22 +82,29 @@ class PClient
       end
 
       def hndl_get_range obj
-        primes, params = PSearchEngine.miller_rabin(obj['range'])
-        cmd_put_solution({
-          'range' => params['range'],
-          'primes' => primes
-        })
+        primes, params = PSearchEngine.miller_rabin(obj)
+        if PSearchEngine.get_status == :finished
+          cmd_put_solution({
+            'range' => params['range'],
+            'primes' => primes
+          })
+        else
+          cmd_put_part_solution({
+            'primes' => primes,
+            'range' => params['range']
+          })
+          params['range'] = (params['range'].max+1)..obj['range'].max
+          RRServer.send_to params
+          obj_received = RRServer.take_received
+          hndl_get_range obj_received
+        end
       end
 
       #---------------- cmd 'putSolution' ---------------- 
       def cmd_put_solution sol
-        resp = {
-          'cmd' => 'putSolution',
-          'range' => sol['range'],
-          'primes' => sol['primes']
-        }
+        obj = { 'cmd' => 'putSolution' }.merge sol
         @last_cmd = 'put_solution'
-        send_object resp
+        send_object obj
       end
 
       def hndl_put_solution obj
@@ -107,6 +114,15 @@ class PClient
           EventMachine::stop_event_loop
         end
       end
+
+      #---------------- cmd 'putPartSolution' ---------------- 
+      def cmd_put_part_solution sol
+        obj = { 'cmd' => 'putPartSolution' }.merge sol
+        @last_cmd = 'put_part_solution'
+        send_object obj
+      end
+
+      def hndl_put_part_solution obj; end
     end
 
     #******************************************
@@ -114,6 +130,7 @@ class PClient
     #******************************************
     class RRServer
       def self.start host, port
+        @@is_received = false
         @@host, @@port = host, port
         serv = TCPServer.new @@host, @@port
         socks = [serv]
@@ -132,6 +149,18 @@ class PClient
               else
                 h = JSON.parse s.gets
                 worked = false if h['cmd'] == 'exit'
+                if h['cmd'] == 'exchange'
+                  @@next_host = h['next_host']
+                  @@next_port = h['next_port']
+                  PSearchEngine.set_status :stoped
+                end
+                if h['cmd'] == 'receive'
+                  @@received_params = h['params']
+                  ends = @@received_params['range'].split('..').map{ |d| d.to_i }
+                  @@received_params['range'] = ends[0]..ends[1]
+                  puts @@received_params
+                  @@is_received = true
+                end
               end
             end
           end
@@ -143,6 +172,23 @@ class PClient
         TCPSocket.open(@@host, @@port) do |s|
           s.puts ({ 'cmd' => 'exit' }).to_json
         end
+      end
+
+      def self.send_to params
+        TCPSocket.open(@@next_host, @@next_port) do |s|
+          s.puts({
+            'cmd' => 'receive',
+            'params' => params
+          }.to_json)
+        end
+      end
+
+      def self.take_received
+        loop do
+          break if @@is_received
+        end
+        @@is_receive = false
+        @@received_params
       end
     end
 end
