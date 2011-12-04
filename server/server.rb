@@ -29,9 +29,7 @@ class Handler
         'msg' => 'Illegal request'
       }
     end
-
     resp = self.send @@cmd_map[req['cmd']], req, client_id
-
     resp.merge({ 'status' => 'OK' })
   end
 
@@ -42,19 +40,17 @@ class Handler
   end
 
   def run_round_robin required_clients_num
-    #puts "Simple clients: #{@clients.c_simple.size}\tRR clients: #{@clients.c_rr.size}\n"
     rr = @clients.c_rr
     return if rr.size < required_clients_num
 
-    puts "\nExchange (Round robin):\n"
-
     arr = ClientContainer.to_array rr
 
-    puts "Before RR: #{arr.to_s}"
+    puts "\nExchange (Round robin):\n"
+    puts "RR (Before): #{arr.to_s}"
 
     exchange = ->(i_from, i_to, r = arr[i_from][1]['range']) do
       c_from, c_to = arr[i_from], arr[i_to]
-      puts "From: #{i_from}\tTo: #{i_to}\tr: #{r}"
+      puts "RR (From): #{c_from[0]}\tTo: #{c_to[0]}\tr: #{r}"
       c_to[1]['range'] = r
       c_from[1]['next_id'] = c_to[0]
       TCPSocket.open(c_from[1]['host'], c_from[1]['port']) do |s|
@@ -70,7 +66,7 @@ class Handler
     (arr.size - 1).downto(1) { |i| exchange.(i - 1, i) }
     exchange.(arr.size - 1, 0, last_range)
 
-    puts "After RR: #{arr.to_s}\n\n"
+    puts "RR (After): #{arr.to_s}\n\n"
   end
 
   private
@@ -163,7 +159,6 @@ class PServer
       end
 
       def receive_object obj
-        puts "ReceiveObject: #{obj['cmd']}"
         send_object @handler.handle(obj, @id)
       end
     end

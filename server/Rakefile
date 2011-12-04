@@ -39,7 +39,7 @@ task :s do
       "Login: #{p[:login]}",
       "Host: #{p[:host]}",
       "Range: #{p[:range_down]}..#{p[:range_up]}\n" + 
-      "Number of primes: #{p[:nums].size}\n"
+      "Number of primes: #{p[:nums].size}\n\n"
     )
   end
 end

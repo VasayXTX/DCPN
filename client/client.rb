@@ -80,7 +80,6 @@ class PClient
       end
 
       def hndl_get_range obj
-        puts "Get range: #{obj}"
         primes, params = PSearchEngine.miller_rabin(obj)
         if PSearchEngine.get_status == :finished
           cmd_put_solution({
@@ -89,8 +88,6 @@ class PClient
           })
           return
         end
-        #puts "\n\nPrimes: #{primes}"
-        #puts "Params: #{params}\n"
         range = params['range'].dup
         params['range'] = (params['range'].max+1)..obj['range'].max
         cmd_put_part_solution({
@@ -124,7 +121,7 @@ class PClient
       def hndl_put_part_solution obj
         RRServer.send_to @last_params
         obj_received = RRServer.take_received
-        #puts "Received from prev client:\t#{obj_received}"
+        puts "\n"
         hndl_get_range obj_received
       end
     end
@@ -157,7 +154,6 @@ class PClient
                 if h['cmd'] == 'local_exit'
                   worked = false 
                 elsif h['cmd'] == 'exchange'
-                  puts "#{h.to_s}"
                   @@next_host = h['next_host']
                   @@next_port = h['next_port']
                   PSearchEngine.set_status :stopped
@@ -199,6 +195,8 @@ class PClient
 end
 
 cnfg = YAML.load_file ARGV[0] ? ARGV[0] : 'configure.yml'
+Process.setpriority(
+  Process::PRIO_PROCESS, 0, cnfg['params']['process_priority'])
 
 begin
   PClient.new.start(

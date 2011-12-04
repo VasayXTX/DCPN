@@ -4,5 +4,6 @@ server:
 params:
   host: 'localhost'
   login: 'ClientOne'
-  range_nums: 3
+  range_nums: 1
+  process_priority: 19
 
