@@ -23,14 +23,14 @@ class Handler
   end
 
   def handle req, client_id
-    if (cmd = @@cmd_map[req['cmd']]).nil?
+    unless req['cmd'] && CMDS.include?(req['cmd'])
       return {
         'status' => 'ERROR',
-        'msg' => 'Illegal command'
+        'msg' => 'Illegal request'
       }
     end
 
-    resp = self.send cmd, req, client_id
+    resp = self.send @@cmd_map[req['cmd']], req, client_id
 
     resp.merge({ 'status' => 'OK' })
   end
@@ -46,45 +46,31 @@ class Handler
     rr = @clients.c_rr
     return if rr.size < required_clients_num
 
-    #puts "Exchange (Round robin):\n"
+    puts "\nExchange (Round robin):\n"
 
     arr = ClientContainer.to_array rr
 
-    #puts "Before RR: #{arr.to_s}"
+    puts "Before RR: #{arr.to_s}"
 
-    exchange = ->(h, p, h_next, p_next) do
-      TCPSocket.open(h, p) do |s|
+    exchange = ->(i_from, i_to, r = arr[i_from][1]['range']) do
+      c_from, c_to = arr[i_from], arr[i_to]
+      puts "From: #{i_from}\tTo: #{i_to}\tr: #{r}"
+      c_to[1]['range'] = r
+      c_from[1]['next_id'] = c_to[0]
+      TCPSocket.open(c_from[1]['host'], c_from[1]['port']) do |s|
         s.puts({
           'cmd' => 'exchange',
-          'next_host' => h_next,
-          'next_port' => p_next
+          'next_host' => c_to[1]['host'],
+          'next_port' => c_to[1]['port']
         }.to_json)
       end
     end
 
-    c_first, c_last = arr[0], arr[arr.size-1]
-    foo = c_last[1]['range'].dup
-    (arr.size - 1).downto(1) do |i|
-      c_cur, c_prev = arr[i], arr[i-1]
-      c_cur[1]['range'] = c_prev[1]['range']
-      c_prev[1]['next_id'] = c_cur[0]
-      exchange.(
-        c_prev[1]['host'],
-        c_prev[1]['port'],
-        c_cur[1]['host'],
-        c_cur[1]['port']
-      )
-    end
-    c_first[1]['range'] = foo
-    c_last[1]['next_id'] = c_first[0]
-    exchange.(
-      c_last[1]['host'],
-      c_last[1]['port'],
-      c_first[1]['host'],
-      c_first[1]['port']
-    )
+    last_range = arr[arr.size - 1][1]['range'].dup
+    (arr.size - 1).downto(1) { |i| exchange.(i - 1, i) }
+    exchange.(arr.size - 1, 0, last_range)
 
-    #puts "After RR: #{arr.to_s}"
+    puts "After RR: #{arr.to_s}\n\n"
   end
 
   private
@@ -135,10 +121,11 @@ class Handler
 
     def cmd_put_part_solution req, client_id
       Prime.create! make_db_record(req, client_id)
-      new_r = (req['range'].max + 1)..r.max unless r.max == req['range'].max
-      @clients.set_range @clients.c_rr[client_id]['next_id'], new_r
-      puts @clients.c_rr.to_s
-      
+      @clients.add_range(
+        @clients.c_rr[client_id]['next_id'],
+        req['next_range']
+      )
+
       {}
     end
 end
@@ -176,6 +163,7 @@ class PServer
       end
 
       def receive_object obj
+        puts "ReceiveObject: #{obj['cmd']}"
         send_object @handler.handle(obj, @id)
       end
     end

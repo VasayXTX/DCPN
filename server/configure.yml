@@ -2,8 +2,8 @@ params:
   host: ''
   port: 4567
 round_robin:
-  interval: 5
-  clients_num: 2
+  interval: 10
+  clients_num: 1
 db:
   name: 'primes'
   host: 'localhost'

@@ -6,34 +6,38 @@ class PSearchEngine
   @@status = :started
 
   def self.miller_rabin obj
+    @@status = :finished
     range = obj['range']
     puts "Miller-Rabin test for #{range}"
     pbar = ProgressBar.new "Processing", 100
     pbar_step = 100.to_f / (range.max - range.min)
 
-    res = []
-    acc = obj['cur_acc'] || Math.log2(range.min).ceil
-    range.each do |x|
+    primes = []
+
+    puts "MR: #{obj}"
+    start = if obj['acc']
+              primes << range.min if MillerRabin.test(
+                range.min, obj['acc'], obj['cur_t'], obj['cur_s'])
+              range.min + 1
+            else
+              range.min
+            end
+
+    (start..range.max).each do |x|
       pbar.inc pbar_step
-      is_prime, params = MillerRabin.test(
-        x,
-        acc,
-        obj['cur_t'],
-        obj['cur_s']
-      )
-      unless params.nil?
-        params['range'] = range.min..(x - 1)
-        return [res, params]
+      is_prime, params = MillerRabin.test(x)
+      unless params.nil?  #If it was stopped
+        params['range'] = range.min..(x-1)
+        return [primes, params]
       else
-        res << x if is_prime
+        primes << x if is_prime
       end
-      acc = Math.log2(x+1).ceil
     end
 
     pbar.finish
     @@status = :finished
 
-    [res, { 'range' => range }]
+    [primes, { 'range' => range }]
   end
 
   def self.set_status status; @@status = status; end
@@ -53,22 +57,20 @@ class PSearchEngine
         res
       end
 
-      def self.test num, acc, cur_t, cur_s
+      def self.test num, acc = Math.log2(num).ceil, t = nil, s = nil
         return [num == 2, nil] if num.even? || num < 2
 
-        if cur_t.nil? || cur_s.nil?
+        if t.nil? || s.nil?
           t, s = num - 1, 1
           while (t >>= 1).even?; s += 1; end
-        else
-          t, s = cur_t, cur_s
         end
 
         (acc).times do |i|
-          if PSearchEngine.get_status == :stoped
+          if PSearchEngine.get_status == :stopped
             return [
               false,
               {
-                'cur_acc' => i, 
+                'acc' => acc - i,
                 'cur_t' => t, 
                 'cur_s' => s
               }
