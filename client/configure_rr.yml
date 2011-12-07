@@ -1,0 +1,11 @@
+server:
+  host: 'localhost'
+  port: 4567
+params:
+  host: 'localhost'
+  login: 'Vanya'
+  range_nums: 1
+  process_priority: 19
+round_robin:
+  port: 9001
+
