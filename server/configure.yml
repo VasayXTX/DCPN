@@ -1,9 +1,11 @@
 params:
   host: ''
   port: 4567
+  range_start: 1
+  range_step: 1000000
 round_robin:
   interval: 10
-  clients_num: 1
+  clients_num: 2
 db:
   name: 'primes'
   host: 'localhost'

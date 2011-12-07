@@ -1,12 +1,10 @@
 #coding: utf-8
 
 class RangeGenerator
-  START = ARGV[0] ? ARGV[0].to_i : 2
-  STEP = ARGV[1] ? ARGV[1].to_i : 10 ** 6
   attr_reader :range
 
-  def initialize step = STEP
-    @step, @range = step, (START..START+step)
+  def initialize start, step
+    @step, @range = step, (start..start+step)
     @buf = []
     @fiber = Fiber.new do
       loop do

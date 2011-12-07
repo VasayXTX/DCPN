@@ -17,8 +17,8 @@ class Handler
   end
   CMDS.each { |cmd| @@cmd_map[cmd] }
 
-  def initialize range_step
-    @range_gen = RangeGenerator.new range_step
+  def initialize range_start, range_step
+    @range_gen = RangeGenerator.new range_start, range_step
     @clients = ClientContainer.new
   end
 
@@ -127,8 +127,8 @@ class Handler
 end
 
 class PServer
-  def self.start host, port, rr
-    handler = Handler.new RangeGenerator::STEP
+  def self.start host, port, rr, range_start, range_step
+    handler = Handler.new range_start, range_step
     EventMachine::run do
       EM.add_periodic_timer(rr['interval']) do
         handler.run_round_robin rr['clients_num']
@@ -175,6 +175,8 @@ end
 PServer.start(
   cnfg['params']['host'],
   cnfg['params']['port'],
-  cnfg['round_robin']
+  cnfg['round_robin'],
+  ARGV[0] ? ARGV[0].to_i : cnfg['params']['range_start'],
+  ARGV[1] ? ARGV[1].to_i : cnfg['params']['range_step']
 )
 
